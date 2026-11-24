@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}{{ query }}{% endblock %}
+{% block body_class %}page-results{% endblock %}
+{% set badge_class = {"IEEE Xplore": "badge-ieee", "OpenAlex": "badge-openalex", "arXiv": "badge-arxiv",
+                      "Semantic Scholar": "badge-s2", "Kaggle dataset": "badge-dataset"} %}
+{% block content %}
+
+<section class="results-search">
+  <div class="container">
+    {% with compact=True %}{% include "_search_form.html" %}{% endwith %}
+  </div>
+</section>
+
+<div class="container results-layout">
+  <section class="results-main" aria-labelledby="results-heading">
+    <header class="results-head">
+      <h1 id="results-heading">
+        {% if results %}Top {{ results|length }} recommendations{% else %}No recommendations found{% endif %}
+      </h1>
+      <p class="results-query">for &ldquo;{{ query }}&rdquo;</p>
+    </header>
+
+    {% if not results %}
+      <div class="empty-state">
+        <svg viewBox="0 0 48 48" width="48" height="48" aria-hidden="true"><circle cx="21" cy="21" r="13" fill="none" stroke="currentColor" stroke-width="3"/><path d="m31 31 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+        <h2>We couldn't find matching papers</h2>
+        <p>Try selecting more sources above, or describe your topic in a little more detail.</p>
+      </div>
+    {% else %}
+      <ol class="result-list">
+        {% for paper in results %}
+          {% set v = paper.verification %}
+          <li class="result-card">
+            <div class="result-rank" aria-hidden="true">{{ loop.index }}</div>
+
+            <div class="result-body">
+              <div class="result-badges">
+                <span class="source-badge {{ badge_class.get(paper.found_via, 'badge-dataset') }}">{{ paper.found_via }}</span>
+                {% if v.is_ieee_verified %}
+                  <span class="verified-badge" title="Published by IEEE (confirmed by the platform's metadata)">
+                    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 1.5 13.5 4v4c0 3.2-2.3 5.6-5.5 6.5C4.8 13.6 2.5 11.2 2.5 8V4z" fill="currentColor"/><path d="m5.5 8 1.8 1.8L10.8 6.3" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    IEEE verified
+                  </span>
+                {% endif %}
+                <span class="subject-tag">{{ paper.subject_area }}</span>
+              </div>
+
+              <h2 class="result-title">
+                <a href="{{ url_for('paper_detail', paper_id=paper.id) }}">{{ paper.title }}</a>
+              </h2>
+
+              <p class="result-meta">
+                {% if v.authors %}<span class="result-authors">{{ v.authors | truncate(140, True, '…') }}</span>{% endif %}
+                {% if v.venue or v.year %}
+                  <span class="result-venue">{% if v.venue %}{{ v.venue }}{% endif %}{% if v.venue and v.year %} · {% endif %}{% if v.year %}{{ v.year }}{% endif %}</span>
+                {% endif %}
+              </p>
+
+              <div class="abstract" data-collapsible>
+                <p class="abstract-text">{{ paper.summary }}</p>
+                <button type="button" class="link-btn abstract-toggle" hidden>Show full abstract</button>
+              </div>
+
+              <div class="result-actions">
+                <a class="btn btn-secondary btn-sm" href="{{ url_for('paper_detail', paper_id=paper.id) }}">View details</a>
+                {% if v.official_url %}
+                  <a class="btn btn-ghost btn-sm" href="{{ v.official_url }}" target="_blank" rel="noopener">
+                    {% if v.is_ieee_verified %}Open on IEEE Xplore{% else %}Open paper{% endif %}
+                    <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M6 3H3v10h10v-3M9 2h5v5M14 2 7 9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </a>
+                {% endif %}
+                {% if v.doi %}
+                  <button type="button" class="btn btn-ghost btn-sm copy-btn" data-copy="https://doi.org/{{ v.doi }}">Copy DOI link</button>
+                {% endif %}
+                {% if not v.is_ieee_verified and not paper.live and v.source %}
+                  <span class="result-note">{{ v.source }}</span>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="result-score" title="Semantic similarity between your query and this paper">
+              <span class="score-value">{{ paper.score_percent }}<small>%</small></span>
+              <span class="score-meter"><span style="width: {{ [paper.score_percent, 100]|min }}%"></span></span>
+              <span class="score-label">match</span>
+            </div>
+          </li>
+        {% endfor %}
+      </ol>
+    {% endif %}
+  </section>
+
+  <aside class="results-aside" aria-label="Search summary">
+    <div class="panel">
+      <h2 class="panel-title">Predicted subject area</h2>
+      <p class="predicted-subject">{{ predicted_label }}</p>
+      {% if predicted_reliable %}
+        <div class="confidence">
+          <span class="confidence-meter"><span style="width: {{ predicted_confidence }}%"></span></span>
+          <span class="confidence-label">{{ predicted_confidence }}% confidence</span>
+        </div>
+      {% else %}
+        <p class="panel-note">Not enough labelled data to predict reliably.</p>
+      {% endif %}
+    </div>
+
+    <div class="panel">
+      <h2 class="panel-title">Sources searched</h2>
+      <ul class="status-list">
+        {% for name, outcome in source_status %}
+          {% set ok = 'found' in outcome or 'searched' in outcome %}
+          <li class="status-item {{ 'is-ok' if ok else 'is-warn' }}">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span class="status-name">{{ name }}</span>
+            <span class="status-outcome">{{ outcome }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="panel panel-muted">
+      <h2 class="panel-title">About match scores</h2>
+      <p class="panel-note">Scores are the cosine similarity between your query and each paper's title and abstract.
+        They show how close the meaning is, not the paper's quality or impact.</p>
+    </div>
+  </aside>
+</div>
+
+{% endblock %}

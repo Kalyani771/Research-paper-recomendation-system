@@ -1,0 +1,33 @@
+{# Shared search form. `compact` = results-page variant. #}
+{% set chosen = selected_sources if selected_sources is defined and selected_sources else default_sources %}
+<form class="search-form {% if compact %}search-form--compact{% endif %}" action="{{ url_for('recommend') }}" method="post" id="search-form">
+  <div class="search-field">
+    <svg class="search-icon" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <label class="visually-hidden" for="query">Research title, topic or problem statement</label>
+    <textarea
+      id="query"
+      name="query"
+      class="search-box"
+      rows="{{ 1 if compact else 2 }}"
+      placeholder="Describe your research topic, title or problem statement…"
+      required
+    >{{ previous_query or '' }}</textarea>
+    <button type="submit" class="btn btn-primary search-submit" id="recommend-btn">
+      <span>{{ 'Search' if compact else 'Find papers' }}</span>
+    </button>
+  </div>
+
+  <input type="hidden" name="sources_submitted" value="1">
+  <div class="source-toggles" role="group" aria-label="Sources to search">
+    <span class="source-toggles-label">Search in</span>
+    {% for key, label in all_sources.items() %}
+      <label class="toggle-chip" title="{% if key == 'dataset' %}{{ '{:,}'.format(paper_count) }} arXiv papers, offline{% elif key == 'ieee' %}{% if ieee_key_configured %}Official IEEE Xplore API{% else %}IEEE papers via OpenAlex (no API key needed){% endif %}{% elif key == 'openalex' %}All publishers{% elif key == 'arxiv' %}Preprints{% elif key == 'semanticscholar' %}{% if s2_key_configured %}API key configured{% else %}Often rate-limited without an API key{% endif %}{% endif %}">
+        <input type="checkbox" name="sources" value="{{ key }}" {% if key in chosen %}checked{% endif %}>
+        <span class="toggle-chip-body">
+          <svg class="toggle-check" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="m3 8.5 3 3 7-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          {{ label }}
+        </span>
+      </label>
+    {% endfor %}
+  </div>
+</form>
